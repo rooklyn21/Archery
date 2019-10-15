@@ -13,6 +13,7 @@ from sql.engines.db2 import Db2Engine
 a = Db2Engine()
 a.get_connection(db_name='sample')
 print(a.server_version)
+print(a.get_all_databases())
 
 # new_engine = Db2Engine(instance=inst1)
 # new_engine.get_connection()
