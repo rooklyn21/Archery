@@ -61,10 +61,79 @@ django.core.exceptions.AppRegistryNotReady: Apps aren't loaded yet.
 # from common.config import SysConfig
 
 AttributeError: 'ibm_db.IBM_DBConnection' object has no attribute 'thread_id'
-查看api文档
-https://github.com/ibmdb/python-ibmdb/wiki/APIs
 
-### 函数列表
+### 查看api文档
+
+版本一：https://github.com/ibmdb/python-ibmdb/wiki/APIs 
+版本二：https://www.python.org/dev/peps/pep-0249/#connection-objects
+
+### db2连接方式
+
+    # dsn方式需要配置 \Lib\site-packages\clidriver\cfg\db2dsdriver.cfg
+    db2_conn = ibm_db.connect(db_name, '', '')
+    
+    # config 方式需要配置 Lib\site-packages\config.py
+    import config
+    db2_conn = ibm_db.connect(config.database, config.user, config.password)
+    
+    # 此方式需要从engines--__init__.py中获取连接参数
+    conn_str = "DATABASE=%s;HOSTNAME=%s;PORT=%s;PROTOCOL=%s;UID=%s;PWD=%s" % \
+        (self.db_name, self.host, self.port, self.protocol, self.user, self.password)
+    db2_conn = ibm_db.connect(conn_str, '', '')
+
+    # 直连方式
+    conn_str = "DATABASE=SAMPLE;HOSTNAME=127.0.0.1;PORT=50000;PROTOCOL=TCPIP;UID=db2inst1;PWD=db2inst1"
+    db2_conn = ibm_db.connect(conn_str, '', '')
+
+### 运行db2test.py报错
+
+### 问题1，TypeError: query() got an unexpected keyword argument 'sql'
+    TypeError: query() takes 1 positional argument but 2 were given
+
+原因：db2.py中复制多了query空函数，删掉即可
+    def query(self):
+        return 0
+
+    sql = "SELECT * FROM animals"
+    a.query(sql=sql)
+
+#### 问题2，AttributeError: 'ibm_db.IBM_DBConnection' object has no attribute 'close'
+因为self_conn用的是ibm_db.connect函数
+db2_conn = ibm_db.connect(conn_str, '', '')
+self.conn = db2_conn
+
+所以在部分需要ibm_db_dbi.Connection的调用中需要添加语句
+conn = ibm_db_dbi.Connection(self.conn)
+
+#### 问题3，<sql.engines.models.ResultSet object at 0x0000019590515198>对象无法查看
+result = a.get_all_databases()
+
+# 查看ResultSet对象
+在models.py里查找ResultSet对象，发现有json, to_dict, to_sep_dict 函数，调用to_dict查看
+    for each in result.to_dict():
+        print(each['TABNAME'])
+
+### ibm_db_dbi接口函数
+
+查看ibm_db_dbi.py文件，检查class Connection的成员函数
+
+    __get_dbms_name()
+    __get_dbms_ver()
+    get_current_schema
+    server_info
+    tables(self, schema_name=None, table_name=None):
+    indexes(self, unique=True, schema_name=None, table_name=None):
+    primary_keys(self, unique=True, schema_name=None, table_name=None):
+    
+    callproc(self, procname, parameters=None)
+    execute(self, operation, parameters=None)
+    executemany(self, operation, seq_parameters):
+    fetchone(self):
+    fetchmany(self, size=0):
+    fetchall(self):
+    nextset(self):
+    
+### ibm_db接口函数
 
     ibm_db.num_rows(res))
     ibm_db.rollback(conn)
@@ -105,9 +174,12 @@ while (ibm_db.fetch_row(stmt)):
     ibm_db_dbi: Python driver for IBM DB2 and IBM Informix databases that complies to the DB-API 2.0 specification. Checkout the README for getting started with ibm_db and ibm_db_dbi
 
 https://github.com/ibmdb/python-ibmdb/blob/master/IBM_DB/ibm_db/README.md
->>> import ibm_db
->>> conn_str='database=pydev;hostname=host.test.com;port=portno;protocol=tcpip;uid=db2inst1;pwd=secret'
->>> ibm_db_conn = ibm_db.connect(conn_str,'','')
->>> import ibm_db_dbi
->>> conn = ibm_db_dbi.Connection(ibm_db_conn)
->>> conn.tables('SYSCAT', '%')
+```
+import ibm_db
+import ibm_db_dbi
+
+conn_str='database=pydev;hostname=host.test.com;port=portno;protocol=tcpip;uid=db2inst1;pwd=secret'
+ibm_db_conn = ibm_db.connect(conn_str,'','')
+conn = ibm_db_dbi.Connection(ibm_db_conn)
+conn.tables('SYSCAT', '%')
+```

@@ -1,6 +1,7 @@
 # -*- coding: UTF-8 -*-
 
 import ibm_db
+import ibm_db_dbi
 import config
 import logging
 import traceback
@@ -18,16 +19,27 @@ logger = logging.getLogger('default')
 
 
 class Db2Engine(EngineBase):
+
+    def __init__(self, instance=None):
+        super(Db2Engine, self).__init__(instance=instance)
+        if instance:
+            self.db_name = instance.db_name
+            self.protocol = int(instance.protocol)
+
     def get_connection(self, db_name=None):
         if self.conn:
-            # self.thread_id = self.conn.thread_id()
             return self.conn
-        if db_name:
-            self.conn = ibm_db.connect(config.database,config.user,config.password)
-        else:
-            self.conn = ibm_db.connect(config.user,config.password)
 
-        # self.thread_id = self.conn.connectionID()
+        conn_str = "DATABASE=SAMPLE;HOSTNAME=127.0.0.1;PORT=50000;PROTOCOL=TCPIP;UID=db2inst1;PWD=db2inst1"
+
+        # 此方式需要从engines--__init__.py中获取连接参数
+        # conn_str = "DATABASE=%s;HOSTNAME=%s;PORT=%s;PROTOCOL=%s;UID=%s;PWD=%s" % \
+        # (self.db_name, self.host, self.port, self.protocol, self.user, self.password)
+
+        db2_conn = ibm_db.connect(conn_str, '', '')
+
+        # self.conn = ibm_db_dbi.Connection(db2_conn)
+        self.conn = db2_conn
 
         return self.conn
 
@@ -41,61 +53,47 @@ class Db2Engine(EngineBase):
 
     @property
     def server_version(self):
-        conn = self.get_connection()
+        conn = ibm_db_dbi.Connection(self.conn)
+        return conn.server_info()
 
-        server_name = ibm_db.server_info(conn).DBMS_NAME
-        server_version = ibm_db.server_info(conn).DBMS_VER
-        version = server_name + '-' + server_version
-
-        # sql_stmt = ibm_db.exec_immediate(conn, "SELECT service_level FROM TABLE (sysproc.env_get_inst_info())")
-        # row = ibm_db.fetch_tuple(sql_stmt)
-        # if row:
-        #     version = row[0]
-
-        return version
+        # return self.conn.server_info()
 
     def get_all_databases(self):
-        """获取数据库列表， 返回resultSet 供上层调用， 暂未实现"""
-        # return self._get_all_schemas()
+        return 0
+
+    def get_all_tables(self, schema_name=None):
+        sql = "SELECT tabname FROM syscat.tables WHERE tabschema = CURRENT schema"
+        result = self.query(sql=sql)
+        db_list = result.rows
+        result.rows = db_list
+        return result
 
     def query(self, db_name=None, sql='', limit_num=0, close_conn=True):
         """返回 ResultSet """
         result_set = ResultSet(full_sql=sql)
         try:
-            conn = self.get_connection(db_name=db_name)
-
-            stmt = ibm_db.prepare(conn, sql, )
-
+            conn = ibm_db_dbi.Connection(self.conn)
+            cursor = conn.cursor()
+            effect_row = cursor.execute(sql)
             if int(limit_num) > 0:
-                rows = ibm_db.fetch_row(stmt, int(limit_num))
+                rows = cursor.fetchmany(size=int(limit_num))
             else:
-                rows = ibm_db.fetch_row(stmt)
-
+                rows = cursor.fetchall()
             fields = cursor.description
 
             result_set.column_list = [i[0] for i in fields] if fields else []
             result_set.rows = rows
             result_set.affected_rows = effect_row
         except Exception as e:
-            logger.warning(f"MySQL语句执行报错，语句：{sql}，错误信息{traceback.format_exc()}")
+            logger.warning(f"SQL语句执行报错，语句：{sql}，错误信息{traceback.format_exc()}")
             result_set.error = str(e)
         finally:
             if close_conn:
                 self.close()
         return result_set
 
-
-    def query_check(self):
-        return 0
-    def filter_sql(self):
-        return 0
-    def query(self):
-        return 0
-    def get_all_databases(self):
-        return 0
-    def get_all_tables(self):
-        return 0
-    def get_all_columns_by_tb(self):
-        return 0
-    def describe_table(self):
-        return 0
+    def close(self):
+        if self.conn:
+            conn = ibm_db_dbi.Connection(self.conn)
+            conn.close()
+            self.conn = None
