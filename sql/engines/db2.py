@@ -2,13 +2,13 @@
 
 import ibm_db
 import ibm_db_dbi
-import config
+# import config
 import logging
 import traceback
 import re
 import sqlparse
 
-# from common.config import SysConfig
+from common.config import SysConfig
 from common.utils.timer import FuncTimer
 from sql.utils.sql_utils import get_syntax_type
 from . import EngineBase
