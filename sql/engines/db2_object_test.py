@@ -2,10 +2,11 @@ import json
 from datetime import timedelta, datetime
 from unittest.mock import patch, Mock, ANY
 
+# django相关
 # from django.contrib.auth import get_user_model
 # from django.test import TestCase
+# from common.config import SysConfig
 
-from common.config import SysConfig
 from sql.engines import EngineBase
 from sql.engines.goinception import GoInceptionEngine
 from sql.engines.models import ResultSet, ReviewSet, ReviewResult
@@ -13,7 +14,7 @@ from sql.engines.mssql import MssqlEngine
 from sql.engines.mysql import MysqlEngine
 from sql.engines.redis import RedisEngine
 from sql.engines.pgsql import PgSQLEngine
-from sql.engines.oracle import Db2Engine
+from sql.engines.oracle import OracleEngine
 from sql.engines.db2 import Db2Engine
 from sql.engines.mongo import MongoEngine
 from sql.engines.inception import InceptionEngine, _repair_json_str
