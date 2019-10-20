@@ -3,12 +3,13 @@
 from django.urls import path
 from django.views.i18n import JavaScriptCatalog
 
+import sql.instance_database
 import sql.query_privileges
 import sql.sql_optimize
 from common import auth, config, workflow, dashboard, check
-from sql import views, sql_workflow, sql_analyze, query, slowlog, instance, db_diagnostic, resource_group, binlog, \
-    data_dictionary
-from sql.utils import tasks
+from sql import views, sql_workflow, sql_analyze, query, slowlog, instance, instance_account, db_diagnostic, \
+    resource_group, binlog, data_dictionary
+from sql.utils import tasks, ding_api
 
 urlpatterns = [
     path('', views.index),
@@ -45,8 +46,8 @@ urlpatterns = [
     path('group/', views.group),
     path('grouprelations/<int:group_id>/', views.groupmgmt),
     path('instance/', views.instance),
-    path('instanceuser/', views.instanceuser),
-    path('instanceuser/<int:instance_id>/', views.instanceuser),
+    path('instanceaccount/', views.instanceaccount),
+    path('database/', views.database),
     path('instanceparam/', views.instance_param),
     path('binlog2sql/', views.binlog2sql),
     path('schemasync/', views.schemasync),
@@ -81,7 +82,18 @@ urlpatterns = [
     path('group/user_all_instances/', resource_group.user_all_instances),
 
     path('instance/list/', instance.lists),
-    path('instance/users/', instance.users),
+
+    path('instance/user/list', instance_account.users),
+    path('instance/user/create/', instance_account.create),
+    path('instance/user/edit/', instance_account.edit),
+    path('instance/user/grant/', instance_account.grant),
+    path('instance/user/reset_pwd/', instance_account.reset_pwd),
+    path('instance/user/delete/', instance_account.delete),
+
+    path('instance/database/list/', sql.instance_database.databases),
+    path('instance/database/create/', sql.instance_database.create),
+    path('instance/database/edit/', sql.instance_database.edit),
+
     path('instance/schemasync/', instance.schemasync),
     path('instance/instance_resource/', instance.instance_resource),
     path('instance/describetable/', instance.describe),
@@ -113,10 +125,13 @@ urlpatterns = [
     path('slowquery/optimize_sqladvisor/', sql.sql_optimize.optimize_sqladvisor),
     path('slowquery/optimize_sqltuning/', sql.sql_optimize.optimize_sqltuning),
     path('slowquery/optimize_soar/', sql.sql_optimize.optimize_soar),
+    path('slowquery/report/', slowlog.report),
 
     path('db_diagnostic/process/', db_diagnostic.process),
     path('db_diagnostic/create_kill_session/', db_diagnostic.create_kill_session),
     path('db_diagnostic/kill_session/', db_diagnostic.kill_session),
     path('db_diagnostic/tablesapce/', db_diagnostic.tablesapce),
     path('db_diagnostic/trxandlocks/', db_diagnostic.trxandlocks),
+
+    path('4admin/sync_ding_user/', ding_api.sync_ding_user)
 ]

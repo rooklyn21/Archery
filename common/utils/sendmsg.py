@@ -1,5 +1,6 @@
 # -*- coding: UTF-8 -*-
 
+import json
 import email
 import smtplib
 import requests
@@ -10,7 +11,8 @@ from email.header import Header
 from email.utils import formataddr
 
 from common.config import SysConfig
-
+from sql.utils.ding_api import get_access_token
+from sql.utils.wx_api import get_wx_access_token, get_wx_headers
 logger = logging.getLogger('default')
 
 
@@ -25,17 +27,24 @@ class MsgSender(object):
             self.MAIL_SSL = kwargs.get('ssl')
         else:
             sys_config = SysConfig()
+            # email信息
             self.MAIL_REVIEW_SMTP_SERVER = sys_config.get('mail_smtp_server')
             self.MAIL_REVIEW_SMTP_PORT = sys_config.get('mail_smtp_port', 0)
             self.MAIL_SSL = sys_config.get('mail_ssl')
             self.MAIL_REVIEW_FROM_ADDR = sys_config.get('mail_smtp_user')
             self.MAIL_REVIEW_FROM_PASSWORD = sys_config.get('mail_smtp_password')
+            # 钉钉信息
+            self.ding_agent_id = sys_config.get('ding_agent_id')
+            # 企业微信信息
+            self.wx_agent_id = sys_config.get('wx_agent_id')
+
         if self.MAIL_REVIEW_SMTP_PORT:
             self.MAIL_REVIEW_SMTP_PORT = int(self.MAIL_REVIEW_SMTP_PORT)
         elif self.MAIL_SSL:
             self.MAIL_REVIEW_SMTP_PORT = 465
         else:
             self.MAIL_REVIEW_SMTP_PORT = 25
+
     @staticmethod
     def _add_attachment(filename):
         """
@@ -47,7 +56,7 @@ class MsgSender(object):
         file_msg.set_payload(open(filename, 'rb').read())
         # 附件如果有中文会出现乱码问题，加入gbk
         file_msg.add_header('Content-Disposition', 'attachment', filename=('gbk', '',
-                            filename.split('/')[-1]))
+                                                                           filename.split('/')[-1]))
         encoders.encode_base64(file_msg)
 
         return file_msg
@@ -114,7 +123,7 @@ class MsgSender(object):
     @staticmethod
     def send_ding(url, content):
         """
-        发送钉钉消息
+        发送钉钉Webhook消息
         :param url:
         :param content:
         :return:
@@ -128,10 +137,57 @@ class MsgSender(object):
         r = requests.post(url=url, json=data)
         r_json = r.json()
         if r_json['errcode'] == 0:
-            logger.debug(f'钉钉推送成功\n通知对象：{url}\n消息内容：{content}')
+            logger.debug(f'钉钉Webhook推送成功\n通知对象：{url}\n消息内容：{content}')
+        else:
+            logger.error("""钉钉Webhook推送失败
+错误码:{}
+返回错误信息:{}
+请求url:{}
+请求data:{}""".format(r_json['errcode'], r_json['errmsg'], url, data))
+
+    def send_ding2user(self, userid_list, content):
+        """
+        发送钉钉消息到个人
+        :param userid_list:
+        :param content:
+        :return:
+        """
+        access_token = get_access_token()
+        data = {
+            "userid_list": ','.join(userid_list),
+            "agent_id": self.ding_agent_id,
+            "msg": {"msgtype": "text", "text": {"content": f"{content}"}},
+        }
+        r = requests.post(
+            url=f"https://oapi.dingtalk.com/topapi/message/corpconversation/asyncsend_v2?access_token={access_token}",
+            json=data)
+        r_json = r.json()
+        if r_json['errcode'] == 0:
+            logger.debug(f'钉钉推送成功\n通知对象：{userid_list}\n消息内容：{content}')
         else:
             logger.error("""钉钉推送失败
+错误码:{}
+返回错误信息:{}
+请求url:{}
+请求data:{}""".format(r_json['errcode'], r_json['errmsg'], userid_list, data))
+
+    def send_wx2user(self, msg, user_list):
+        to_user = '|'.join(user_list)
+        send_url = 'https://qyapi.weixin.qq.com/cgi-bin/message/send?access_token=%s' % get_wx_access_token()
+        dict_data = {
+            "touser": to_user,
+            "msgtype": "markdown",
+            "agentid": self.wx_agent_id,
+            "markdown": {
+                "content": msg
+            },
+        }
+        res = requests.post(send_url, json=dict_data, headers=get_wx_headers(), timeout=5, verify=True)
+        r_json = res.json()
+        if r_json['errcode'] == 0:
+            logger.debug(f'企业微信推送成功\n通知对象：{to_user}')
+        else:
+            logger.error("""企业微信推送失败
                             错误码:{}
                             返回错误信息:{}
-                            请求url:{}
-                            请求data:{}""".format(r_json['errcode'], r_json['errmsg'], url, data))
+                            """.format(r_json['errcode'], json.dumps(r_json)))

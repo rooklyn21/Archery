@@ -4,8 +4,8 @@ from django.contrib.auth.admin import UserAdmin
 
 # Register your models here.
 from .models import Users, Instance, SqlWorkflow, SqlWorkflowContent, QueryLog, DataMaskingColumns, DataMaskingRules, \
-    AliyunAccessKey, AliyunRdsConfig, ResourceGroup, ResourceGroup2User, ResourceGroup2Instance, QueryPrivilegesApply, \
-    QueryPrivileges, \
+    AliyunRdsConfig, ResourceGroup, ResourceGroup2User, ResourceGroup2Instance, QueryPrivilegesApply, \
+    QueryPrivileges, InstanceAccount, InstanceDatabase, \
     WorkflowAudit, WorkflowLog, ParamTemplate, ParamHistory, InstanceTag, InstanceTagRelations
 
 
@@ -19,7 +19,7 @@ class UsersAdmin(UserAdmin):
     # 编辑页显示内容
     fieldsets = (
         ('认证信息', {'fields': ('username', 'password')}),
-        ('个人信息', {'fields': ('display', 'email')}),
+        ('个人信息', {'fields': ('display', 'email', 'ding_user_id', 'wx_user_id')}),
         ('权限信息', {'fields': ('is_superuser', 'is_active', 'is_staff', 'groups', 'user_permissions')}),
         ('其他信息', {'fields': ('date_joined',)}),
     )
@@ -173,6 +173,32 @@ class WorkflowLogAdmin(admin.ModelAdmin):
     list_filter = ('operation_type_desc', 'operator_display')
 
 
+# 实例数据库列表
+@admin.register(InstanceDatabase)
+class InstanceDatabaseAdmin(admin.ModelAdmin):
+    list_display = ('db_name', 'owner_display', 'instance', 'remark')
+    search_fields = ('db_name',)
+    list_filter = ('instance', 'owner_display')
+    list_display_links = ('db_name',)
+
+    # 仅支持修改备注
+    def get_readonly_fields(self, request, obj=None):
+        return ('instance', 'owner', 'owner_display') if obj else ()
+
+
+# 实例用户列表
+@admin.register(InstanceAccount)
+class InstanceAccountAdmin(admin.ModelAdmin):
+    list_display = ('user', 'host', 'password', 'instance', 'remark')
+    search_fields = ('user', 'host')
+    list_filter = ('instance', 'host')
+    list_display_links = ('user',)
+
+    # 仅支持修改备注
+    def get_readonly_fields(self, request, obj=None):
+        return ('user', 'host', 'instance',) if obj else ()
+
+
 # 实例参数配置表
 @admin.register(ParamTemplate)
 class ParamTemplateAdmin(admin.ModelAdmin):
@@ -188,13 +214,6 @@ class ParamHistoryAdmin(admin.ModelAdmin):
     list_display = ('variable_name', 'instance', 'old_var', 'new_var', 'user_display', 'create_time')
     search_fields = ('variable_name',)
     list_filter = ('instance', 'user_display')
-
-
-# 阿里云的认证信息
-@admin.register(AliyunAccessKey)
-class AliAccessKeyAdmin(admin.ModelAdmin):
-    list_display = ('ak', 'secret', 'is_enable', 'remark',)
-    search_fields = ['ak']
 
 
 # 阿里云实例配置信息

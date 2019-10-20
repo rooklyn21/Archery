@@ -1,6 +1,8 @@
 # -*- coding: UTF-8 -*-
 from django.db import models
 from django.contrib.auth.models import AbstractUser
+from mirage import fields
+
 from common.utils.aes_decryptor import Prpcrypt
 from django.utils.translation import gettext as _
 
@@ -10,6 +12,8 @@ class Users(AbstractUser):
     用户信息扩展
     """
     display = models.CharField('显示的中文名', max_length=50, default='')
+    ding_user_id = models.CharField('钉钉UserID', max_length=64, blank=True, null=True)
+    wx_user_id = models.CharField('企业微信UserID', max_length=64, blank=True, null=True)
     failed_login_count = models.IntegerField('失败计数', default=0)
     last_login_failed_at = models.DateTimeField('上次失败登录时间', blank=True, null=True)
 
@@ -470,6 +474,44 @@ class DataMaskingRules(models.Model):
         verbose_name_plural = u'脱敏规则配置'
 
 
+class InstanceAccount(models.Model):
+    """
+    实例账号列表
+    """
+    instance = models.ForeignKey(Instance, on_delete=models.CASCADE)
+    user = fields.EncryptedCharField(verbose_name='账号', max_length=128)
+    host = models.CharField(verbose_name='主机', max_length=64)
+    password = fields.EncryptedCharField(verbose_name='密码', max_length=128, default='', blank=True)
+    remark = models.CharField('备注', max_length=255)
+    sys_time = models.DateTimeField('系统修改时间', auto_now=True)
+
+    class Meta:
+        managed = True
+        db_table = 'instance_account'
+        unique_together = ('instance', 'user', 'host')
+        verbose_name = '实例账号列表'
+        verbose_name_plural = '实例账号列表'
+
+
+class InstanceDatabase(models.Model):
+    """
+    实例数据库列表
+    """
+    instance = models.ForeignKey(Instance, on_delete=models.CASCADE)
+    db_name = models.CharField('数据库名', max_length=128)
+    owner = models.CharField('负责人', max_length=50, default='', blank=True)
+    owner_display = models.CharField('负责人中文名', max_length=50, default='', blank=True)
+    remark = models.CharField('备注', max_length=255, default='', blank=True)
+    sys_time = models.DateTimeField('系统修改时间', auto_now=True)
+
+    class Meta:
+        managed = True
+        db_table = 'instance_database'
+        unique_together = ('instance', 'db_name')
+        verbose_name = '实例数据库'
+        verbose_name_plural = '实例数据库列表'
+
+
 class ParamTemplate(models.Model):
     """
     实例参数模板配置
@@ -516,8 +558,8 @@ class Config(models.Model):
     """
     配置信息表
     """
-    item = models.CharField('配置项', max_length=50, primary_key=True)
-    value = models.CharField('配置项值', max_length=200)
+    item = models.CharField('配置项', max_length=200, primary_key=True)
+    value = fields.EncryptedCharField(verbose_name='配置项值', max_length=500)
     description = models.CharField('描述', max_length=200, default='', blank=True)
 
     class Meta:
@@ -527,55 +569,13 @@ class Config(models.Model):
         verbose_name_plural = u'系统配置'
 
 
-class AliyunAccessKey(models.Model):
-    """
-    记录阿里云的认证信息
-    """
-    ak = models.CharField(max_length=50)
-    secret = models.CharField(max_length=100)
-    is_enable = models.BooleanField('是否启用', default=True)
-    remark = models.CharField(max_length=50, default='', blank=True)
-
-    @property
-    def raw_ak(self):
-        """ 返回明文ak str """
-        pc = Prpcrypt()  # 初始化
-        return pc.decrypt(self.ak)
-
-    @property
-    def raw_secret(self):
-        """ 返回明文secret str """
-        pc = Prpcrypt()  # 初始化
-        return pc.decrypt(self.secret)
-
-    class Meta:
-        managed = True
-        db_table = 'aliyun_access_key'
-        verbose_name = u'阿里云认证信息'
-        verbose_name_plural = u'阿里云认证信息'
-
-    def save(self, *args, **kwargs):
-        pc = Prpcrypt()  # 初始化
-        if self.id:
-            old_info = AliyunAccessKey.objects.get(id=self.id)
-            old_ak = old_info.ak
-            old_secret = old_info.secret
-        else:
-            old_ak = ''
-            old_secret = ''
-        # 加密信息有变动才再次加密保存
-        self.ak = pc.encrypt(self.ak) if old_ak != self.ak else self.ak
-        self.secret = pc.encrypt(self.secret) if old_secret != self.secret else self.secret
-        super(AliyunAccessKey, self).save(*args, **kwargs)
-
-
 class AliyunRdsConfig(models.Model):
     """
     阿里云rds配置信息
     """
     instance = models.OneToOneField(Instance, on_delete=models.CASCADE)
     rds_dbinstanceid = models.CharField('对应阿里云RDS实例ID', max_length=100)
-    is_enable = models.BooleanField('是否启用', default=True)
+    is_enable = models.BooleanField('是否启用', default=False)
 
     def __int__(self):
         return self.rds_dbinstanceid
@@ -608,9 +608,11 @@ class Permission(models.Model):
             ('menu_instance', '菜单 实例管理'),
             ('menu_instance_list', '菜单 实例列表'),
             ('menu_dbdiagnostic', '菜单 会话管理'),
-            ('menu_instance_user', '菜单 实例用户列表'),
+            ('menu_database', '菜单 数据库管理'),
+            ('menu_instance_account', '菜单 实例账号管理'),
             ('menu_param', '菜单 参数配置'),
             ('menu_data_dictionary', '菜单 数据字典'),
+            ('menu_menu_tools', '菜单 工具插件'),
             ('menu_binlog2sql', '菜单 Binlog2SQL'),
             ('menu_schemasync', '菜单 SchemaSync'),
             ('menu_system', '菜单 系统管理'),
@@ -628,10 +630,12 @@ class Permission(models.Model):
             ('query_review', '审核查询权限'),
             ('query_submit', '提交SQL查询'),
             ('query_all_instances', '可查询所有实例'),
+            ('query_resource_group_instance', '可查询所在资源组内的所有实例'),
             ('process_view', '查看会话'),
             ('process_kill', '终止会话'),
             ('tablespace_view', '查看表空间'),
             ('trxandlocks_view', '查看锁信息'),
+            ('instance_account_manage', '管理实例账号'),
             ('param_view', '查看实例参数列表'),
             ('param_edit', '修改实例参数'),
         )
