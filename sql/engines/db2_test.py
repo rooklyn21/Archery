@@ -20,7 +20,7 @@ from sql.engines.db2 import Db2Engine
 class TestDb2():
 
     def setUp(self):
-        self.ins = Instance.objects.create(instance_name='db2inst1', type='slave', db_type='db2',
+        self.ins = Instance().objects.create(instance_name='db2inst1', type='slave', db_type='db2',
                                            host='127.0.0.1', port=50000, user='db2inst1', password='db2inst1',
                                            db_name='SAMPLE', protocol='TCPIP')
     def test_get_connection(self):
@@ -74,7 +74,7 @@ DB_TYPE_CHOICES = (
     ('inception', 'Inception'),
     ('goinception', 'goInception'))
 
-class Instance(models.Model):
+class Instance():
     """
     各个线上实例配置
     """

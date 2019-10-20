@@ -2,7 +2,6 @@
 
 import ibm_db
 import ibm_db_dbi
-# import config
 import logging
 import traceback
 import re
@@ -10,12 +9,14 @@ import sqlparse
 
 #django相关
 # from common.config import SysConfig
+# from sql.utils.data_masking import brute_mask
 
 from common.utils.timer import FuncTimer
 from sql.utils.sql_utils import get_syntax_type
 from . import EngineBase
 from .models import ResultSet, ReviewSet, ReviewResult
-# from sql.utils.data_masking import brute_mask
+
+
 
 logger = logging.getLogger('default')
 
@@ -30,16 +31,10 @@ class Db2Engine(EngineBase):
     def get_connection(self, db_name=None):
         if self.conn:
             return self.conn
-
         conn_str = "DATABASE=%s;HOSTNAME=%s;PORT=%s;PROTOCOL=TCPIP;UID=%s;PWD=%s" % \
             (self.db_name, self.host, self.port, self.user, self.password)
-
-        # conn_str = "DATABASE=SAMPLE;HOSTNAME=127.0.0.1;PORT=50000;PROTOCOL=TCPIP;UID=db2inst1;PWD=db2inst1"
-        # self.conn = db2_conn
-
         ibm_db_conn = ibm_db.connect(conn_str, '', '')
         self.conn = ibm_db_dbi.Connection(ibm_db_conn)
-
         return self.conn
 
     @property
@@ -55,48 +50,35 @@ class Db2Engine(EngineBase):
         conn = self.get_connection()
         return conn.server_info()
 
-
     def get_all_databases(self):
-        """获取数据库列表， 返回resultSet 供上层调用， 底层实际上是获取db2的schema列表"""
-        return self._get_all_schemas()
+        """获取数据库列表， 返回resultSet"""
 
     def _get_all_databases(self):
         """获取数据库列表, 返回一个ResultSet"""
-        sql = "SELECT name FROM sysibm.sysschemata WHERE definer=%s " % (self.service_name.upper())
-        result = self.query(sql=sql)
-        db_list = [row[0] for row in result.rows]
-        result.rows = db_list
-        return result
 
     def _get_all_instances(self):
         """获取实例列表, 返回一个ResultSet"""
-        sql = "SELECT name FROM sysibm.sysschemata WHERE definer=%s " % (self.service_name.upper())
-        result = self.query(sql=sql)
-        instance_list = [row[0] for row in result.rows]
-        result.rows = instance_list
-        return result
 
     def _get_all_schemas(self):
         """获取模式列表, 返回一个ResultSet"""
-        result = self.query(sql="SELECT schemaname FROM syscat.schemata where schemaname = CURRENT SCHEMA")
-        schemaname = ('DB2INST1','NULLID','SQLJ','SYSCAT','SYSFUN','SYSIBM','SYSIBMADM','SYSIBMINTERNAL',
-                      'SYSIBMTS','SYSPROC','SYSPUBLIC','SYSSTAT','SYSTOOLS')
-        schema_list = [row[0] for row in result.rows if row[0] not in schemaname]
+        result = self.query(sql="SELECT schemaname FROM syscat.schemata")
+        sysschema = ['DB2INST1','NULLID','SQLJ','SYSCAT','SYSFUN','SYSIBM','SYSIBMADM','SYSIBMINTERNAL','SYSIBMTS','SYSPROC','SYSPUBLIC','SYSSTAT','SYSTOOLS']
+        schema_list = [row for row in result.rows if row not in sysschema]
         result.rows = schema_list
         return result
 
     def get_all_tables(self, schema_name=None):
         """获取table 列表, 返回一个ResultSet"""
-        sql = "SELECT tabname FROM syscat.tables WHERE tabschema = CURRENT schema"
+        sql = f"""SELECT tabname FROM syscat.tables WHERE tabschema = CURRENT schema"""
         result = self.query(sql=sql)
-        db_list = result.rows
+        db_list = [row for row in result.rows]
         result.rows = db_list
         return result
 
     def get_all_columns_by_tb(self, db_name, tb_name):
         """获取所有字段, 返回一个ResultSet"""
         result = self.describe_table(db_name, tb_name)
-        column_list = [row[0] for row in result.rows]
+        column_list = [row for row in result.rows]
         result.rows = column_list
         return result
 
