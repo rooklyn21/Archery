@@ -89,7 +89,7 @@ class TestDb2:
         new_engine = Db2Engine(instance=self.ins)
         new_engine.get_connection(self.ins)
         sql = f"""select * from staff"""
-        rs = new_engine.filter_sql(sql,5)
+        rs = new_engine.filter_sql(sql, 5)
         print(rs)
 
     def test_query(self):
@@ -103,6 +103,7 @@ class TestDb2:
         new_engine.get_connection(self.ins)
         rs = new_engine.query_masking("SAMPLE", f"""SELECT * FROM staff limit 5""")
         print(rs.to_dict())
+
 
 test1 = TestDb2()
 # test1.test_get_connection()
