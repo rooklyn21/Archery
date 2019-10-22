@@ -17,14 +17,14 @@ from sql.engines.db2 import Db2Engine
 
 
 class Instance:
-    def __init__(self, instance_name, host, port, user,password, db_name, protocol):
+    def __init__(self, instance_name, host, port, user,password, service_name, protocol):
         # Instance('db2inst1','127.0.0.1',50000,'db2inst1','db2inst1','SAMPLE','TCPIP')
         self.instance_name = instance_name
         self.host = host
         self.port = port
         self.user = user
         self.password = password
-        self.db_name = db_name
+        self.service_name = service_name
         self.protocol = protocol
     @property
     def raw_password(self):
@@ -36,7 +36,7 @@ class Instance:
 
 class TestDb2:
     def __init__(self):
-        self.ins = Instance('db2inst1', '127.0.0.1', 50000, 'db2inst1', 'db2inst1', 'SAMPLE', 'TCPIP')
+        self.ins = Instance('db2inst1', '127.0.0.1', 50000, 'db2inst1', 'db2inst1', 'sample', 'TCPIP')
         # return self.ins
 
     def test_get_connection(self):

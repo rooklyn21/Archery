@@ -17,7 +17,6 @@ from . import EngineBase
 from .models import ResultSet, ReviewSet, ReviewResult
 
 
-
 logger = logging.getLogger('default')
 
 
@@ -25,14 +24,14 @@ class Db2Engine(EngineBase):
 
     def __init__(self, instance=None):
         super(Db2Engine, self).__init__(instance=instance)
-        if instance:
-            self.db_name = instance.db_name
+        self.service_name = instance.service_name
 
     def get_connection(self, db_name=None):
         if self.conn:
             return self.conn
         conn_str = "DATABASE=%s;HOSTNAME=%s;PORT=%s;PROTOCOL=TCPIP;UID=%s;PWD=%s" % \
-            (self.db_name, self.host, self.port, self.user, self.password)
+            (self.service_name, self.host, int(self.port), self.user, self.password)
+        # print(conn_str)
         ibm_db_conn = ibm_db.connect(conn_str, '', '')
         self.conn = ibm_db_dbi.Connection(ibm_db_conn)
         return self.conn
@@ -52,17 +51,28 @@ class Db2Engine(EngineBase):
 
     def get_all_databases(self):
         """获取数据库列表， 返回resultSet"""
+        return self._get_all_databases()
 
     def _get_all_databases(self):
         """获取数据库列表, 返回一个ResultSet"""
+        sql = "SELECT name FROM sysibm.sysschemata WHERE definer=%s " % (self.service_name.upper())
+        result = self.query(sql=sql)
+        db_list = [row[0] for row in result.rows]
+        result.rows = db_list
+        return result
 
     def _get_all_instances(self):
         """获取实例列表, 返回一个ResultSet"""
+        sql = "SELECT name FROM sysibm.sysschemata WHERE definer=%s " % (self.service_name.upper())
+        result = self.query(sql=sql)
+        instance_list = [row[0] for row in result.rows]
+        result.rows = instance_list
+        return result
 
     def _get_all_schemas(self):
         """获取模式列表, 返回一个ResultSet"""
         result = self.query(sql="SELECT schemaname FROM syscat.schemata")
-        sysschema = ['DB2INST1','NULLID','SQLJ','SYSCAT','SYSFUN','SYSIBM','SYSIBMADM','SYSIBMINTERNAL','SYSIBMTS','SYSPROC','SYSPUBLIC','SYSSTAT','SYSTOOLS']
+        sysschema = ('DB2INST1','NULLID','SQLJ','SYSCAT','SYSFUN','SYSIBM','SYSIBMADM','SYSIBMINTERNAL','SYSIBMTS','SYSPROC','SYSPUBLIC','SYSSTAT','SYSTOOLS')
         schema_list = [row for row in result.rows if row not in sysschema]
         result.rows = schema_list
         return result
