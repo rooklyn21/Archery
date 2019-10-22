@@ -40,6 +40,7 @@ DB_TYPE_CHOICES = (
     ('redis', 'Redis'),
     ('pgsql', 'PgSQL'),
     ('oracle', 'Oracle'),
+    ('db2', 'Db2'),
     ('mongo', 'Mongo'),
     ('phoenix', 'Phoenix'),
     ('inception', 'Inception'),

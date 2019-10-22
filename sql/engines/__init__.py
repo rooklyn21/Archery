@@ -116,6 +116,9 @@ def get_engine(instance=None):  # pragma: no cover
     elif instance.db_type == 'oracle':
         from .oracle import OracleEngine
         return OracleEngine(instance=instance)
+    elif instance.db_type == 'db2':
+        from .db2 import Db2Engine
+        return Db2Engine(instance=instance)
     elif instance.db_type == 'mongo':
         from .mongo import MongoEngine
         return MongoEngine(instance=instance)

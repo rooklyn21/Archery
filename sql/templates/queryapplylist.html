@@ -52,6 +52,7 @@
                             <optgroup id="optgroup-redis" label="Redis"></optgroup>
                             <optgroup id="optgroup-pgsql" label="PgSQL"></optgroup>
                             <optgroup id="optgroup-oracle" label="Oracle"></optgroup>
+                            <optgroup id="optgroup-db2" label="Db2"></optgroup>
                             <optgroup id="optgroup-mongo" label="Mongo"></optgroup>
                             <optgroup id="optgroup-phoenix" label="Phoenix"></optgroup>
                         </select>
@@ -161,6 +162,7 @@
                         $("#optgroup-redis").empty();
                         $("#optgroup-pgsql").empty();
                         $("#optgroup-oracle").empty();
+                        $("#optgroup-db2").empty();
                         $("#optgroup-mongo").empty();
                         $("#optgroup-phoenix").empty();
                         for (var i = 0; i < result.length; i++) {
@@ -175,6 +177,8 @@
                                 $("#optgroup-pgsql").append(instance);
                             } else if (result[i]['db_type'] === 'oracle') {
                                 $("#optgroup-oracle").append(instance);
+                            } else if (result[i]['db_type'] === 'db2') {
+                                $("#optgroup-db2").append(instance);
                             } else if (result[i]['db_type'] === 'mongo') {
                                 $("#optgroup-mongo").append(instance);
                             } else if (result[i]['db_type'] === 'phoenix') {
