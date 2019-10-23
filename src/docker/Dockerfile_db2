@@ -1,0 +1,24 @@
+FROM hhyo/archery:1.7.0
+
+ENV VERSION v1.7.1
+
+WORKDIR /opt/archery
+
+#1.7.0 add db2driver
+ADD ibm_db ./ibm_db
+RUN cd ibm_db \
+    && tar -zxf linuxx64_odbc_cli.tar.gz \
+    && source /opt/venv4archery/bin/activate \
+    && python3 setup.py install \
+    && cp -r clidriver /opt/venv4archery/lib/python3.6/site-packages/ibm_db-3.0.1-py3.6-linux-x86_64.egg/ \
+    && cd /opt/archery \
+    && rm -rf ibm_db
+
+#1.7.1a 
+ADD patch.rar
+
+#port
+EXPOSE 9123
+
+#start service
+ENTRYPOINT bash /opt/archery/src/docker/startup.sh && bash
