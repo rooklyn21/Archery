@@ -8,14 +8,13 @@ import re
 import sqlparse
 
 #django相关
-# from common.config import SysConfig
-# from sql.utils.data_masking import brute_mask
-
+from common.config import SysConfig
 from common.utils.timer import FuncTimer
 from sql.utils.sql_utils import get_syntax_type
 from . import EngineBase
 from .models import ResultSet, ReviewSet, ReviewResult
-
+#django相关
+from sql.utils.data_masking import brute_mask
 
 logger = logging.getLogger('default')
 
@@ -29,10 +28,9 @@ class Db2Engine(EngineBase):
     def get_connection(self, db_name=None):
         if self.conn:
             return self.conn
-        conn_str = "DATABASE=%s;HOSTNAME=%s;PORT=%s;PROTOCOL=TCPIP;UID=%s;PWD=%s" % \
-            (self.service_name, self.host, int(self.port), self.user, self.password)
-        # print(conn_str)
-        ibm_db_conn = ibm_db.connect(conn_str, '', '')
+        connstr = "DATABASE=%s;HOSTNAME=%s;PORT=%d;PROTOCOL=TCPIP;UID=%s;PWD=%s;" % \
+            (self.service_name, self.host, self.port, self.user, self.password)
+        ibm_db_conn = ibm_db.connect(connstr, '', '')
         self.conn = ibm_db_dbi.Connection(ibm_db_conn)
         return self.conn
 
@@ -47,48 +45,42 @@ class Db2Engine(EngineBase):
     @property
     def server_version(self):
         conn = self.get_connection()
-        return conn.server_info()
+        version = conn.version
+        return tuple([n for n in version.split('.')[:3]])
 
     def get_all_databases(self):
         """获取数据库列表， 返回resultSet"""
-        return self._get_all_databases()
+        return self._get_all_schemas()
 
     def _get_all_databases(self):
         """获取数据库列表, 返回一个ResultSet"""
-        sql = "SELECT name FROM sysibm.sysschemata WHERE definer=%s " % (self.service_name.upper())
-        result = self.query(sql=sql)
-        db_list = [row[0] for row in result.rows]
-        result.rows = db_list
+        return self.service_name
         return result
 
     def _get_all_instances(self):
         """获取实例列表, 返回一个ResultSet"""
-        sql = "SELECT name FROM sysibm.sysschemata WHERE definer=%s " % (self.service_name.upper())
-        result = self.query(sql=sql)
-        instance_list = [row[0] for row in result.rows]
-        result.rows = instance_list
-        return result
+        return 0
+
 
     def _get_all_schemas(self):
         """获取模式列表, 返回一个ResultSet"""
-        result = self.query(sql="SELECT schemaname FROM syscat.schemata")
-        sysschema = ('DB2INST1','NULLID','SQLJ','SYSCAT','SYSFUN','SYSIBM','SYSIBMADM','SYSIBMINTERNAL','SYSIBMTS','SYSPROC','SYSPUBLIC','SYSSTAT','SYSTOOLS')
-        schema_list = [row for row in result.rows if row not in sysschema]
+        result = self.query(sql="SELECT schemaname FROM syscat.schemata where schemaname = CURRENT SCHEMA")
+        schema_list = [row[0] for row in result.rows]
         result.rows = schema_list
         return result
 
-    def get_all_tables(self, schema_name=None):
+    def get_all_tables(self, db_name):
         """获取table 列表, 返回一个ResultSet"""
-        sql = f"""SELECT tabname FROM syscat.tables WHERE tabschema = CURRENT schema"""
+        sql = "SELECT tabname FROM syscat.tables WHERE tabschema = CURRENT SCHEMA"
         result = self.query(sql=sql)
-        db_list = [row for row in result.rows]
+        db_list = [row[0] for row in result.rows]
         result.rows = db_list
         return result
 
     def get_all_columns_by_tb(self, db_name, tb_name):
         """获取所有字段, 返回一个ResultSet"""
         result = self.describe_table(db_name, tb_name)
-        column_list = [row for row in result.rows]
+        column_list = [row[0] for row in result.rows]
         result.rows = column_list
         return result
 
@@ -146,18 +138,25 @@ class Db2Engine(EngineBase):
         try:
             conn = self.get_connection()
             cursor = conn.cursor()
-            effect_row = cursor.execute(sql)
-            if int(limit_num) > 0:
-                rows = cursor.fetchmany(size=int(limit_num))
-            else:
-                rows = cursor.fetchall()
+            if db_name:
+                cursor.execute(f"SET CURRENT SCHEMA = {db_name};")
+            cursor.execute(sql)
             fields = cursor.description
+            if any(x[1] == ibm_db_dbi.DBAPITypeObject for x in fields):
+                rows = [tuple([(c.read() if type(c) == ibm_db_dbi.STRING else c) for c in r]) for r in cursor]
+                if int(limit_num) > 0:
+                    rows =  rows[0:int(limit_num)]
+            else:
+                if int(limit_num) > 0:
+                    rows = cursor.fetchmany(int(limit_num))
+                else:
+                    rows = cursor.fetchall()
 
             result_set.column_list = [i[0] for i in fields] if fields else []
-            result_set.rows = rows
-            result_set.affected_rows = effect_row
+            result_set.rows = [tuple(x) for x in rows]
+            result_set.affected_rows = len(result_set.rows)
         except Exception as e:
-            logger.warning(f"SQL语句执行报错，语句：{sql}，错误信息{traceback.format_exc()}")
+            logger.warning(f"DB2 语句执行报错，语句：{sql}，错误信息{traceback.format_exc()}")
             result_set.error = str(e)
         finally:
             if close_conn:
