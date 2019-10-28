@@ -193,7 +193,7 @@ if ENABLE_LDAP:
     """
     AUTH_LDAP_ALWAYS_UPDATE_USER = True  # 每次登录从ldap同步用户信息
     AUTH_LDAP_USER_ATTR_MAP = {  # key为archery.sql_users字段名，value为ldap中字段名，用户同步信息
-        "username": "cn",
+        "username": "uid",
         "display": "displayname",
         "email": "mail"
     }
