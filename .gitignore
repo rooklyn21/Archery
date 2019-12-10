@@ -10,3 +10,4 @@ archery/settings_dev.py
 sql/migrations/
 venv
 *.tar
+/.vscode/
